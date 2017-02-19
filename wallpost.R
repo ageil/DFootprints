@@ -3,7 +3,7 @@
 ########################
 # source("~/R/DFootprints/wallpostSQL.R")
 # load("~/R/DFootprints/wallpost.RData")
-load("~/Dropbox/Programming/DFootprints/wallpost.RData")
+load("~/Google Drive/Digital Footprints/DFootprints/wallpost.RData")
 
 
 #####################
@@ -105,11 +105,12 @@ rm(urban)
 
 # AGE
 wp$age <- difftime(wp$time, wp$birth, units="days")/365.25 
-wp$age <- trunc(wp$age)    # removing decimals
+wp$age <- trunc(wp$age) %>% 
+    as.integer() # removing decimals
 
 # AGE GROUPS
-wp$agecat <- as.numeric(wp$age) %>%
-    cut(breaks=c(15, 30, 45, 60, Inf),
+wp$agecat <- wp$age %>%
+    cut(breaks=c(14, 30, 45, 60, Inf),
         labels=c("15-29", "30-44", "45-59", "60+"))
 
 ## FORMATTING
@@ -120,6 +121,10 @@ wp$birth <- ymd(wp$birth)
 wp$gender <- as.factor(wp$gender)
 wp$edu <- as.factor(wp$edu)
 wp$munic <- as.factor(wp$munic)
+wp$age <- as.integer(wp$age)
+wp <- arrange(wp, id, time) %>% 
+    .[,c(2,1,3:13)]
+
 
 ##################
 ### REGRESSION ###
@@ -132,11 +137,6 @@ pwp <- pdata.frame(wp, c("id", "time"))
 
 # Adding variables
 pwp$month <- as.numeric(pwp$time)
-pwp$signup <- 84 - pwp$month #                                          flawed!
-
-# pwp$signup <- as.matrix(tapply(pwp$time, pwp$id, 
-#                                function(x) {max(as.numeric(as.factor(x)))}))
-
 
 ## LINEAR MODEL
 # OLS
@@ -181,6 +181,7 @@ exp(summary(pfixed2)$est)
 #####################
 library(ggplot2)
 library(ggthemes)
+library(RColorBrewer)
 library(zoo)
 
 # Monthly posts
@@ -241,4 +242,128 @@ plot2b <- ggplot(wpost2, aes(x=time, y=posts)) +
     # theme(legend.position = "top")
     theme_stata(scheme = "s2color", base_size = 11, base_family = "sans")
 plot2b
+
+
+
+# plotting data
+dates <- seq(min(wp$time), max(wp$time), by="month") %>% 
+    rep(.,each=5) %>% 
+    data.frame(time=., agecat=rep(c(NA,"15-29","30-44","45-59","60+"), length(.)/5))
+
+# potential users by age group
+pusers <- wp[,c("time","agecat","posts")] %>% 
+    cbind(., pusers=1) %>%
+    as.data.frame() %>% 
+    group_by(time, agecat) %>% 
+    summarize(posts=sum(posts), pusers=sum(pusers)) %>% 
+    arrange(., agecat, time)
+
+# active users by age group
+ausers <- wp[,c("id", "time","posts","agecat")] %>% 
+    filter(posts > 0) %>% 
+    group_by(time, agecat) %>% 
+    summarize(ausers=n_distinct(id)) %>% 
+    arrange(., time, agecat)
+
+df <- merge(dates, pusers, by=c("time", "agecat"), all=TRUE) %>%
+    merge(., ausers, by=c("time","agecat"), all=TRUE) %>% 
+    arrange(., agecat, time) 
+
+df$posts[is.na(df$posts)] <- 0
+df$pusers[is.na(df$pusers)] <- 0
+df$ausers[is.na(df$ausers)] <- 0
+
+# posts per potential user by age group
+df$ppp <- df$posts/df$pusers
+
+# Plot 3: Potential and active users by age group over time (+ posts)
+df %>% 
+    na.omit() %>% # exclude <15 agecat
+    select(time, agecat, pusers, ausers, ppp) %>%
+    mutate(ppp=ppp*10) %>% # scaling 2nd y-axis
+    melt(id=c("time", "agecat")) %>%  # to long format
+    ggplot(., aes(x=time, y=value, group=variable, color=variable)) +
+    geom_line() +
+    facet_wrap(~agecat) +
+    scale_y_continuous(sec.axis = sec_axis(~.*0.1, name = "Posts")) + # scaling 2nd y-axis
+    scale_color_discrete(name="", 
+                         labels=c("Potential users", "Active users", "Posts per potential user")) +
+    labs(x="Date", y="Users") +
+    theme(legend.position="bottom") +
+    theme_stata(scheme = "s2color", base_size = 11, base_family = "sans")
+
+
+# Plot 4: Share active users of potential users by age group over time
+df %>% 
+    na.omit() %>% 
+    select(time, agecat, pusers, ausers) %>% 
+    mutate(apshare= ausers/pusers*100) %>% 
+    select(time, agecat, apshare) %>% 
+    ggplot(., aes(x=time, y=apshare, group=agecat, color=agecat)) +
+    geom_line() +
+    scale_color_discrete(name="") +
+    labs(x="Date", y="Active of potential users (%)") +
+    theme(legend.position="bottom") +
+    theme_stata(scheme="s2color", base_size=11, base_family="sans")
+    
+
+# Plot 5: Share of total posts over time by percentile most active users
+# data to plot
+wp %>% 
+    select(time, posts) %>% 
+    filter(time=="2007-05-01") %>% 
+    arrange(time,desc(posts)) %>% 
+    group_by(time) %>% 
+    mutate(share = posts/sum(posts)*100, 
+           n = n()) %>% 
+    mutate(cshare = cumsum(share)) %>% 
+    arrange(time, desc(posts), desc(cshare)) %>% 
+    mutate(p1 = cshare[ceiling(floor(n)*0.01)])
+
+perc <- wp %>% 
+    select(time, posts) %>% 
+    arrange(time, desc(posts)) %>% 
+    group_by(time) %>% 
+    mutate(# csum = cumsum(posts),
+           share = posts/sum(posts)*100,
+           n = n()) %>% 
+    mutate(cshare = cumsum(share)) %>% 
+    mutate(p1 = cshare[ceiling(floor(n)*0.01)], # % of content produced by 1% most active
+           p2_5 = cshare[ceiling(floor(n)*0.025)], # ... 2.5% most active
+           p5 = cshare[ceiling(floor(n)*0.05)], # ... 5% most active
+           p10 = cshare[ceiling(floor(n)*0.1)], # ... 10% most active etc.
+           p20 = cshare[ceiling(floor(n)*0.2)],
+           p25 = cshare[ceiling(floor(n)*0.25)],
+           p30 = cshare[ceiling(floor(n)*0.30)],
+           p40 = cshare[ceiling(floor(n)*0.40)],
+           p50 = cshare[ceiling(floor(n)*0.50)],
+           p75 = cshare[ceiling(floor(n)*0.75)],
+           #p95 = cshare[ceiling(floor(n)*0.90)],
+           p100 = cshare[ceiling(floor(n)*1.00)])
+# sx$accpostshare[floor(dim(x)[1]*0.2)] 
+
+# simple line plot
+perc %>% 
+    # select(time, p1, p5, p10, p20, p25, p50) %>% 
+    select(-c(posts, share, n, cshare)) %>% 
+    unique() %>% 
+    melt(id="time") %>% 
+    ggplot(., aes(x=time, y=value, group=variable, color=variable)) + 
+    geom_line() +
+    labs(x = "Date", y = "Share of total wallposts (%)") +
+    scale_color_brewer(name="", 
+                       palette="Paired",
+                       labels=c("1%", "2.5%", "5%", "10%", "20%", "25%", "30%", 
+                                "40%", "50%", "75%", "100%"),
+                       guide=guide_legend(reverse=TRUE))
+
+    # theme(legend.position="right") +
+    # theme_stata(scheme="s2color", base_size=11, base_family="sans")
+
+# streamgraph
+library(streamgraph)
+
+# Plot 6: Share of total wallposts by percentiles over time, by demographics
+
+
 
