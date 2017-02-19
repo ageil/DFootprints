@@ -1,4 +1,4 @@
-use "/Users/anders1991/Google Drev/Arbejde/Digital Footprints/Data/diffusion_age_clean.dta", clear
+use "/Users/anders1991/Google Drive/Digital Footprints/Data/diffusion_age_clean.dta", clear
 graph drop _all
 
 generate ppp = post/acc_firstact // posts per potential participant

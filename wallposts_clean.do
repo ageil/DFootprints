@@ -65,7 +65,7 @@ ORDER BY parinfo.id LIMIT 100000000"
 */
 
 *use "/Users/anders1991/Google Drev/Digital Footprints/Data/wallposts.dta", clear
-use "/Users/anders1991/Google Drev/Digital Footprints/Data/wallposts clean.dta", clear
+use "/Users/anders1991/Google Drive/Digital Footprints/Data/wallposts clean.dta", clear
 graph drop _all
 
 
