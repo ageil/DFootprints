@@ -183,6 +183,7 @@ library(ggplot2)
 library(ggthemes)
 library(RColorBrewer)
 library(zoo)
+library(reshape2)
 
 # Monthly posts
 wpost1 <- aggregate(posts ~ as.yearmon(time) + id, data=wp, sum)
@@ -338,13 +339,10 @@ perc <- wp %>%
            p40 = cshare[ceiling(floor(n)*0.40)],
            p50 = cshare[ceiling(floor(n)*0.50)],
            p75 = cshare[ceiling(floor(n)*0.75)],
-           #p95 = cshare[ceiling(floor(n)*0.90)],
            p100 = cshare[ceiling(floor(n)*1.00)])
-# sx$accpostshare[floor(dim(x)[1]*0.2)] 
 
 # simple line plot
 perc %>% 
-    # select(time, p1, p5, p10, p20, p25, p50) %>% 
     select(-c(posts, share, n, cshare)) %>% 
     unique() %>% 
     melt(id="time") %>% 
@@ -356,14 +354,4 @@ perc %>%
                        labels=c("1%", "2.5%", "5%", "10%", "20%", "25%", "30%", 
                                 "40%", "50%", "75%", "100%"),
                        guide=guide_legend(reverse=TRUE))
-
-    # theme(legend.position="right") +
-    # theme_stata(scheme="s2color", base_size=11, base_family="sans")
-
-# streamgraph
-library(streamgraph)
-
-# Plot 6: Share of total wallposts by percentiles over time, by demographics
-
-
 
