@@ -355,3 +355,17 @@ perc %>%
                                 "40%", "50%", "75%", "100%"),
                        guide=guide_legend(reverse=TRUE))
 
+
+# Mean monthly wallposts by demographic
+wp %>% 
+    select(posts, gender, urban, agecat) %>% 
+    group_by(gender, urban, agecat) %>% 
+    summarize(mean_posts=mean(posts)) %>% 
+    na.omit() %>% 
+    ggplot(., aes(x=agecat, y=mean_posts, fill=agecat)) +
+    geom_bar(stat="identity") +
+    facet_wrap(gender~urban) +
+    labs(x="", y="Average monthly wallposts") +
+    scale_fill_brewer(name="",
+                      palette="Set1")
+
